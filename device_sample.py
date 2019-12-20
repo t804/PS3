@@ -10,16 +10,7 @@ with open(device_path, "rb") as device:
   event = device.read(EVENT_SIZE)
   while event:
     (ds3_time, ds3_val, ds3_type, ds3_num) = struct.unpack(EVENT_FORMAT, event)
-    if ds3_num == 25:
-      # bring up
-      pass
-    elif ds3_num == 23:
-      pass
-    elif ds3_num == 24:
-      # rotation right
-      pass
-    # if -100<ds3_val and ds3_val<100:
-    else:
-      print( "{0}, {1}, {2}, {3}".format( ds3_time, ds3_val, ds3_type, ds3_num ) )
-
+    if -100<ds3_val and ds3_val<100:
+       print( "{0}, {1}, {2}, {3}".format( ds3_time, ds3_val, ds3_type, ds3_num ) )
+    
     event = device.read(EVENT_SIZE)
