@@ -1,7 +1,7 @@
 #coding: utf-8
 import struct
 import logging
-import lib.new_motor_speed as motor
+import new_motor_speed as motor
 
 device_path = "/dev/input/js0"
 
@@ -12,20 +12,21 @@ EVENT_FORMAT = "LhBB"
 EVENT_SIZE = struct.calcsize(EVENT_FORMAT)
 
 '''
-action
-
+state  := forward | stopped | stopping | backward
+action := forward | stop | rotate | backward
 '''
 
 def parse_event(event):
   (time, val, action_type, action_num) = struct.unpack(EVENT_FORMAT, event)
   action = ""
-  # TODO: 要調査
   if action_num == 13 and val==1:
     # ○ボタン押す
     action = "forward"
-  elif action_num == 13 and val==0:
-    # ○ボタン離す
+  elif action_num in (13,14) and val==0:
+    # ○ボタン or ×ボタン を離す
     action = "stop"
+  elif action_num == 14 and val== 1:
+    action = "backward"
   elif action_type==2 and action_num == 0:
     action = "rotate"
 
@@ -42,23 +43,23 @@ def step_action(action, action_value, state, state_value):
   '''
   Finite-State Automaton
   '''
-  if action == "forward" and state == "stopped":
-    state = "forward"
+  if action in ("forward", "backward") and state == "stopped":
+    state = action
     state_value = convert_theta(0)
-  elif action == "stop" and state == "forward":
+  elif action == "stop" and state in ("forward", "backward"):
     state = "stopping"  # stoppingを追加する
   elif state == "stopping":
     state = "stopped"
   elif action == "stop" and state == "stopped":
     pass  ## unreachable except for initial state
-  elif action == "rotate" and state == "forward":
-    state = "forward"
+  elif action == "rotate" and state in ("forward", "backward"):
+    state = state  ## unchange state
     state_value = convert_theta(action_value)
   elif debug and action:
     print("UNKNOWN ACTION: {0}, STATE: {1}".format(action, state))
   return (state, state_value)
 
-def direction2speed(direction_value, default_speed = 7000):
+def direction2speed(direction_value, default_speed = 10000):
   MAX_VAL = 32767  # assume right-most value
   MIN_VAL = -32767  # assume left-most value
   if direction_value == 0:
@@ -77,15 +78,25 @@ def direction2speed(direction_value, default_speed = 7000):
     right_bias = 1. - left_bias
 
   if debug==2:
-    print("left_bias: {0}, right_bias: {1}".format(left_bias, right_bias))
+    print("left_speed: {0}, right_speed: {1}".format(default_speed*left_bias, default_speed*right_bias))
   return (int(default_speed * left_bias),
           int(default_speed * right_bias))
 
 
+def run_motor(speed_left, speed_right):
+  print("speed_left: {0}, speed_right: {1}".format(speed_left, speed_right))
+  motor.move_both_wheels(speed_left, speed_right)
+  
+
 def execute_action(state, state_value):
   if state == "forward":
-      (left_speed, right_speed) = direction2speed(state_value)
-      motor.move_both_wheels(left_speed, right_speed)
+    (left_speed, right_speed) = direction2speed(state_value)
+    #motor.move_both_wheels(left_speed, right_speed)
+    run_motor(left_speed, right_speed)
+  if state == "backward":
+    (left_speed, right_speed) = direction2speed(state_value)
+    # motor.move_both_wheels(-left_speed, -right_speed)
+    run_motor(-left_speed, -right_speed)  
   if state == "stopped":
       motor.move_both_wheels(0, 0)
 
