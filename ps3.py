@@ -1,5 +1,5 @@
 import struct
-import new_motor_speed as motor
+import lib.new_motor_speed as motor
 
 device_path = "/dev/input/js0"
 
@@ -14,13 +14,13 @@ def parse_event(event):
   (time, val, action_type, action_num) = struct.unpack(EVENT_FORMAT, event)
   action = ""
   # TODO: 要調査
-  if action_num == 25 and val==0:
+  if action_num == 13 and val==1:
     # ○ボタン押す
     action = "forward"
-  elif action_num == 25 and val==1:
+  elif action_num == 13 and val==0:
     # ○ボタン離す
     action = "stop"
-  elif action_num == 23:
+  elif action_type==2 and action_num == 0:
     action = "rotate"
 
   if debug:
