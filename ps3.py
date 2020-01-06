@@ -6,6 +6,8 @@ import new_motor_speed as motor
 device_path = "/dev/input/js0"
 
 debug = 2
+CURRENT_SPEED = 10000
+
 
 # unsigned long, short, unsigned char, unsigned char
 EVENT_FORMAT = "LhBB"
@@ -17,6 +19,7 @@ action := forward | stop | rotate | backward
 '''
 
 def parse_event(event):
+  global CURRENT_SPEED
   (time, val, action_type, action_num) = struct.unpack(EVENT_FORMAT, event)
   action = ""
   if action_num == 13 and val==1:
@@ -29,7 +32,13 @@ def parse_event(event):
     action = "backward"
   elif action_type==2 and action_num == 0:
     action = "rotate"
-
+  elif action_type==1 and action_num == 10 and val==1:
+    if CURRENT_SPEED>0:
+      CURRENT_SPEED -= 10000  # currently hardcoding
+  elif action_type==1 and action_num == 11 and val==1:
+    if CURRENT_SPEED<50000:
+      CURRENT_SPEED += 10000
+# 
   if debug==1:
     print("action {0} time: {1}, val: {2}, type: {3}, num: {4}"
           .format(action, time, val, action_type, action_num))
@@ -59,12 +68,12 @@ def step_action(action, action_value, state, state_value):
     print("UNKNOWN ACTION: {0}, STATE: {1}".format(action, state))
   return (state, state_value)
 
-def direction2speed(direction_value, default_speed = 10000):
+def direction2speed(direction_value, default_speed):
   MAX_VAL = 32767  # assume right-most value
   MIN_VAL = -32767  # assume left-most value
-  if direction_value == 0:
-    return (default_speed, default_speed)
 
+  if direction_value == 0:
+    return (int(0.5*default_speed), int(0.5*default_speed))
   if direction_value<MIN_VAL or MAX_VAL<direction_value:
     raise "ERROR: "
 
@@ -90,11 +99,11 @@ def run_motor(speed_left, speed_right):
 
 def execute_action(state, state_value):
   if state == "forward":
-    (left_speed, right_speed) = direction2speed(state_value)
+    (left_speed, right_speed) = direction2speed(state_value, CURRENT_SPEED)
     #motor.move_both_wheels(left_speed, right_speed)
     run_motor(left_speed, right_speed)
   if state == "backward":
-    (left_speed, right_speed) = direction2speed(state_value)
+    (left_speed, right_speed) = direction2speed(state_value, CURRENT_SPEED)
     # motor.move_both_wheels(-left_speed, -right_speed)
     run_motor(-left_speed, -right_speed)  
   if state == "stopped":
@@ -109,6 +118,9 @@ def routine(event, state, state_value):
   return (state, state_value)
 
 def main():
+  motor.L6470_SPI_CHANNEL = 0
+  motor.init()
+  motor.L6470_SPI_CHANNEL = 1
   motor.init()
   try:
     with open(device_path, "rb") as device:
